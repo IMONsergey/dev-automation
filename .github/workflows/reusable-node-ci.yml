@@ -23,6 +23,11 @@ on:
         required: false
         type: string
         default: "."
+      install-command:
+        description: Optional explicit dependency install command; empty uses the package-manager default frozen install
+        required: false
+        type: string
+        default: ""
       lint-script:
         description: package.json script name; empty disables
         required: false
@@ -104,7 +109,16 @@ jobs:
           esac
 
       - name: Install dependencies
+        env:
+          INSTALL_COMMAND: ${{ inputs.install-command }}
         run: |
+          set -euo pipefail
+          if [ -n "$INSTALL_COMMAND" ]; then
+            echo "Using explicit install command"
+            bash -lc "$INSTALL_COMMAND"
+            exit 0
+          fi
+
           case "$PACKAGE_MANAGER" in
             npm) npm ci ;;
             pnpm) pnpm install --frozen-lockfile ;;
