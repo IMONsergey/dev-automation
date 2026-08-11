@@ -1,0 +1,166 @@
+name: Reusable Node CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node.js version used by the project
+        required: false
+        type: string
+        default: "22"
+      package-manager:
+        description: npm, pnpm, yarn, or bun
+        required: false
+        type: string
+        default: npm
+      pnpm-version:
+        description: pnpm version used when package-manager is pnpm
+        required: false
+        type: string
+        default: "10"
+      working-directory:
+        description: Directory containing package.json
+        required: false
+        type: string
+        default: "."
+      lint-script:
+        description: package.json script name; empty disables
+        required: false
+        type: string
+        default: lint
+      typecheck-script:
+        description: package.json script name; empty disables
+        required: false
+        type: string
+        default: typecheck
+      test-script:
+        description: package.json script name; empty disables
+        required: false
+        type: string
+        default: test
+      build-script:
+        description: package.json script name; empty disables
+        required: false
+        type: string
+        default: build
+      artifact-path:
+        description: Build artifact path relative to working-directory; empty disables upload
+        required: false
+        type: string
+        default: dist
+      artifact-name:
+        description: Uploaded build artifact name
+        required: false
+        type: string
+        default: build-output
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      PACKAGE_MANAGER: ${{ inputs.package-manager }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+          package-manager-cache: false
+
+      - name: Setup pnpm
+        if: inputs.package-manager == 'pnpm'
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ inputs.pnpm-version }}
+          run_install: false
+
+      - name: Setup Bun
+        if: inputs.package-manager == 'bun'
+        uses: oven-sh/setup-bun@v2
+
+      - name: Enable Corepack for Yarn
+        if: inputs.package-manager == 'yarn'
+        run: corepack enable
+
+      - name: Validate package manager
+        run: |
+          case "$PACKAGE_MANAGER" in
+            npm|pnpm|yarn|bun) ;;
+            *)
+              echo "::error::Unsupported package-manager: $PACKAGE_MANAGER"
+              exit 2
+              ;;
+          esac
+
+      - name: Install dependencies
+        run: |
+          case "$PACKAGE_MANAGER" in
+            npm) npm ci ;;
+            pnpm) pnpm install --frozen-lockfile ;;
+            yarn) yarn install --immutable ;;
+            bun) bun install --frozen-lockfile ;;
+          esac
+
+      - name: Lint
+        if: inputs.lint-script != ''
+        env:
+          SCRIPT_NAME: ${{ inputs.lint-script }}
+        run: |
+          if node -e 'const p=require("./package.json"); process.exit(p.scripts?.[process.env.SCRIPT_NAME] ? 0 : 1)'; then
+            "$PACKAGE_MANAGER" run "$SCRIPT_NAME"
+          else
+            echo "Skipping missing script: $SCRIPT_NAME"
+          fi
+
+      - name: Typecheck
+        if: inputs.typecheck-script != ''
+        env:
+          SCRIPT_NAME: ${{ inputs.typecheck-script }}
+        run: |
+          if node -e 'const p=require("./package.json"); process.exit(p.scripts?.[process.env.SCRIPT_NAME] ? 0 : 1)'; then
+            "$PACKAGE_MANAGER" run "$SCRIPT_NAME"
+          else
+            echo "Skipping missing script: $SCRIPT_NAME"
+          fi
+
+      - name: Test
+        if: inputs.test-script != ''
+        env:
+          SCRIPT_NAME: ${{ inputs.test-script }}
+        run: |
+          if node -e 'const p=require("./package.json"); process.exit(p.scripts?.[process.env.SCRIPT_NAME] ? 0 : 1)'; then
+            "$PACKAGE_MANAGER" run "$SCRIPT_NAME"
+          else
+            echo "Skipping missing script: $SCRIPT_NAME"
+          fi
+
+      - name: Build
+        if: inputs.build-script != ''
+        env:
+          SCRIPT_NAME: ${{ inputs.build-script }}
+        run: |
+          if node -e 'const p=require("./package.json"); process.exit(p.scripts?.[process.env.SCRIPT_NAME] ? 0 : 1)'; then
+            "$PACKAGE_MANAGER" run "$SCRIPT_NAME"
+          else
+            echo "Skipping missing script: $SCRIPT_NAME"
+          fi
+
+      - name: Upload build artifact
+        if: inputs.artifact-path != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.working-directory }}/${{ inputs.artifact-path }}
+          if-no-files-found: ignore
+          retention-days: 7
