@@ -25,24 +25,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Validate YAML syntax
-        shell: python
-        run: |
-          import pathlib
-          import sys
-          import yaml
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.25"
+          cache: false
 
-          files = list(pathlib.Path('.github').rglob('*.yml')) + list(pathlib.Path('examples').rglob('*.yml'))
-          failures = []
-          for path in files:
-              try:
-                  yaml.safe_load(path.read_text())
-                  print(f'OK {path}')
-              except Exception as exc:
-                  failures.append(f'{path}: {exc}')
-          if failures:
-              print('\n'.join(failures), file=sys.stderr)
-              raise SystemExit(1)
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+      - name: Validate GitHub Actions workflows
+        run: actionlint
 
       - name: Check reusable workflow contract
         shell: bash
