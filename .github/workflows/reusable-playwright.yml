@@ -21,6 +21,11 @@ on:
         required: false
         type: string
         default: "."
+      install-command:
+        description: Optional explicit dependency install command; empty uses the package manager's frozen install
+        required: false
+        type: string
+        default: ""
       test-command:
         description: Optional explicit Playwright test command
         required: false
@@ -72,7 +77,14 @@ jobs:
         run: corepack enable
 
       - name: Install dependencies
+        env:
+          INSTALL_COMMAND: ${{ inputs.install-command }}
         run: |
+          if [ -n "$INSTALL_COMMAND" ]; then
+            bash -lc "$INSTALL_COMMAND"
+            exit
+          fi
+
           case "$PACKAGE_MANAGER" in
             npm) npm ci ;;
             pnpm) pnpm install --frozen-lockfile ;;
