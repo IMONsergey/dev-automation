@@ -49,7 +49,8 @@ jobs:
       - name: Check forbidden trigger
         shell: bash
         run: |
-          if grep -R --line-number 'pull_request_target:' .github/workflows; then
-            echo '::error::pull_request_target is forbidden in shared automation'
+          needle="pull_request_"'target:'
+          if grep -R --line-number "$needle" .github/workflows; then
+            echo '::error::Forbidden privileged pull-request trigger found in shared automation'
             exit 1
           fi
