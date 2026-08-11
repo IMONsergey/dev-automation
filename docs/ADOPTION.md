@@ -22,14 +22,34 @@ jobs:
 
 Supported package managers: `npm`, `pnpm`, `yarn`, `bun`.
 
-Optional script-name inputs:
+Optional inputs:
 
+- `install-command` (default empty; overrides the default dependency install when explicitly set)
 - `lint-script` (default `lint`)
 - `typecheck-script` (default `typecheck`)
 - `test-script` (default `test`)
 - `build-script` (default `build`)
+- `artifact-path` (default `dist`)
+- `artifact-name` (default `build-output`)
 
 If a named script is absent from `package.json`, it is skipped. Set an input to an empty string to disable that stage explicitly.
+
+The default dependency installation is intentionally frozen/reproducible:
+
+- npm: `npm ci`
+- pnpm: `pnpm install --frozen-lockfile`
+- yarn: `yarn install --immutable`
+- bun: `bun install --frozen-lockfile`
+
+For an imported repository that intentionally has no lockfile yet, use an explicit temporary override instead of duplicating the whole CI workflow:
+
+```yaml
+    with:
+      package-manager: npm
+      install-command: npm install --no-audit --no-fund
+```
+
+Introduce a lockfile deliberately later and then remove the override so CI returns to frozen installs.
 
 For pnpm callers, `pnpm-version` defaults to `10` and can be overridden per project.
 
@@ -68,6 +88,22 @@ Use after a deployment job that exposes a URL:
     with:
       url: ${{ needs.deploy.outputs.url }}
 ```
+
+For a stable production alias, a caller may also run the smoke workflow after `main` pushes and on a low-frequency schedule. Keep the URL in the caller repository because deployment targets are project-specific.
+
+## First production pilot — BAEV
+
+`IMONsergey/BAEV-WEBSITE` validates the initial adoption pattern:
+
+- private consumer repository;
+- central Node CI via `@v1`;
+- explicit lockfile-less npm install override;
+- Vite build artifact upload;
+- local project-specific regression guard;
+- shared production HTTP smoke workflow;
+- six-hour production availability schedule.
+
+Use this pattern as the reference for similar Figma Make/Vite repositories, then tighten each project toward a committed lockfile and browser E2E coverage.
 
 ## Repository rules
 
