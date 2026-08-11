@@ -31,6 +31,16 @@ on:
         required: false
         type: string
         default: ""
+      base-url:
+        description: Optional external base URL exposed to Playwright as PLAYWRIGHT_BASE_URL
+        required: false
+        type: string
+        default: ""
+      artifact-prefix:
+        description: Optional prefix for report/result artifact names when a caller runs multiple Playwright jobs
+        required: false
+        type: string
+        default: ""
       install-browsers:
         description: Install Chromium and Linux dependencies
         required: false
@@ -109,6 +119,7 @@ jobs:
       - name: Run Playwright
         env:
           TEST_COMMAND: ${{ inputs.test-command }}
+          PLAYWRIGHT_BASE_URL: ${{ inputs.base-url }}
         run: |
           if [ -n "$TEST_COMMAND" ]; then
             bash -lc "$TEST_COMMAND"
@@ -126,7 +137,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: ${{ inputs.artifact-prefix }}playwright-report
           path: ${{ inputs.working-directory }}/playwright-report
           if-no-files-found: ignore
           retention-days: 14
@@ -135,7 +146,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-test-results
+          name: ${{ inputs.artifact-prefix }}playwright-test-results
           path: ${{ inputs.working-directory }}/test-results
           if-no-files-found: ignore
           retention-days: 14
