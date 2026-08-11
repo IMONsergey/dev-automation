@@ -1,0 +1,90 @@
+name: Reusable HTTP Smoke Test
+
+on:
+  workflow_call:
+    inputs:
+      url:
+        description: Absolute preview or production URL
+        required: true
+        type: string
+      expected-status:
+        description: Expected HTTP status
+        required: false
+        type: string
+        default: "200"
+      attempts:
+        description: Retry attempts while deployment warms up
+        required: false
+        type: number
+        default: 6
+      delay-seconds:
+        description: Delay between attempts
+        required: false
+        type: number
+        default: 10
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Validate URL
+        env:
+          TARGET_URL: ${{ inputs.url }}
+        run: |
+          case "$TARGET_URL" in
+            https://*|http://*) ;;
+            *)
+              echo "::error::url must start with http:// or https://"
+              exit 2
+              ;;
+          esac
+
+      - name: Wait for expected response
+        env:
+          TARGET_URL: ${{ inputs.url }}
+          EXPECTED_STATUS: ${{ inputs.expected-status }}
+          ATTEMPTS: ${{ inputs.attempts }}
+          DELAY_SECONDS: ${{ inputs.delay-seconds }}
+        run: |
+          set -u
+          : > response-body.html
+          for attempt in $(seq 1 "$ATTEMPTS"); do
+            status="$(
+              curl \
+                --location \
+                --silent \
+                --show-error \
+                --connect-timeout 10 \
+                --max-time 30 \
+                --output response-body.html \
+                --write-out '%{http_code}' \
+                "$TARGET_URL" || true
+            )"
+
+            echo "Attempt $attempt/$ATTEMPTS -> HTTP $status"
+
+            if [ "$status" = "$EXPECTED_STATUS" ]; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt "$ATTEMPTS" ]; then
+              sleep "$DELAY_SECONDS"
+            fi
+          done
+
+          echo "::error::Expected HTTP $EXPECTED_STATUS from $TARGET_URL"
+          exit 1
+
+      - name: Upload response body on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-response
+          path: response-body.html
+          if-no-files-found: ignore
+          retention-days: 7

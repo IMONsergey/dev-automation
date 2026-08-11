@@ -1,0 +1,56 @@
+name: Foundation Validation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".github/dependabot.yml"
+      - "examples/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - ".github/dependabot.yml"
+      - "examples/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.25"
+          cache: false
+
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+      - name: Validate GitHub Actions workflows
+        run: actionlint
+
+      - name: Check reusable workflow contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in .github/workflows/reusable-*.yml; do
+            grep -q 'workflow_call:' "$file"
+            echo "Reusable contract present: $file"
+          done
+
+      - name: Check forbidden trigger
+        shell: bash
+        run: |
+          needle="pull_request_"'target:'
+          if grep -R --line-number "$needle" .github/workflows; then
+            echo '::error::Forbidden privileged pull-request trigger found in shared automation'
+            exit 1
+          fi
