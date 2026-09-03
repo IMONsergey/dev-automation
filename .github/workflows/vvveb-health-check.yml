@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/vvveb-health-check.yml'
+  pull_request:
   workflow_dispatch:
 
 jobs:
