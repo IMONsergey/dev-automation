@@ -1,0 +1,36 @@
+name: Vvveb health check
+
+on:
+  push:
+    paths:
+      - '.github/workflows/vvveb-health-check.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe Vvveb endpoints
+        shell: bash
+        run: |
+          set -u
+          urls=(
+            'https://vvveb-cdo-2844s-projects.vercel.app/'
+            'https://vvveb-cdo-2844s-projects.vercel.app/__health'
+            'https://vvveb-cdo-2844s-projects.vercel.app/admin/'
+            'https://vvveb-3lch7li32-cdo-2844s-projects.vercel.app/'
+          )
+          for u in "${urls[@]}"; do
+            echo "=== $u ==="
+            headers=$(mktemp)
+            body=$(mktemp)
+            code=$(curl -sS --max-time 20 -D "$headers" -o "$body" -w '%{http_code}' "$u" || true)
+            echo "HTTP $code"
+            sed -n '1,20p' "$headers"
+            echo '--- body head ---'
+            head -c 800 "$body" || true
+            echo
+            echo
+            rm -f "$headers" "$body"
+          done
